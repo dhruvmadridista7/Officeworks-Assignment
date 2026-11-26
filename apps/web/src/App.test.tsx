@@ -95,7 +95,11 @@ describe('catalogue user journeys', () => {
   });
 
   it('shows top-rated and additional products on the category page', async () => {
-    renderApp('/category/electronics');
+    const user = userEvent.setup();
+    renderApp();
+    await user.click(
+      await screen.findByRole('link', { name: 'electronics' }),
+    );
 
     expect(
       await screen.findByRole('heading', { name: 'Top rated' }),
@@ -182,6 +186,13 @@ describe('catalogue user journeys', () => {
 
   it('validates the enquiry form and shows thank-you after successful submit', async () => {
     const user = userEvent.setup();
+    let submittedEnquiry: unknown;
+    server.use(
+      http.post(`${API_URL}/enquiries`, async ({ request }) => {
+        submittedEnquiry = await request.json();
+        return HttpResponse.json({ status: 'received' }, { status: 201 });
+      }),
+    );
     renderApp('/products/1/enquire');
 
     expect(
@@ -209,6 +220,14 @@ describe('catalogue user journeys', () => {
     expect(
       screen.getByRole('link', { name: 'Continue browsing' }),
     ).toHaveAttribute('href', '/');
+    expect(submittedEnquiry).toEqual({
+      productId: 1,
+      name: 'Jane Doe',
+      email: 'jane@example.com',
+      phone: '+91 98765 43210',
+      message: 'Is this available?',
+      website: '',
+    });
   });
 
   it('shows an API error instead of thank-you when enquiry delivery fails', async () => {
@@ -275,6 +294,26 @@ describe('catalogue user journeys', () => {
       await screen.findByRole('heading', { name: 'Featured products' }),
     ).toBeInTheDocument();
     expect(attempts).toBe(3);
+  });
+
+  it('shows a loading state while the featured products request is pending', async () => {
+    let releaseResponse: (() => void) | undefined;
+    const responseGate = new Promise<void>((resolve) => {
+      releaseResponse = resolve;
+    });
+    server.use(
+      http.get(`${API_URL}/products/featured`, async () => {
+        await responseGate;
+        return HttpResponse.json({ products });
+      }),
+    );
+    renderApp();
+
+    expect(screen.getByText(/Loading featured products/)).toBeInTheDocument();
+    releaseResponse?.();
+    expect(
+      await screen.findByRole('heading', { name: 'Featured products' }),
+    ).toBeInTheDocument();
   });
 
   it('does not automatically retry a not-found product response', async () => {
