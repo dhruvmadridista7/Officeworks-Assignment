@@ -5,6 +5,7 @@
     "module": "CommonJS",
     "moduleResolution": "Node",
     "esModuleInterop": true,
+    "resolveJsonModule": true,
     "types": ["node", "vitest/globals"]
   },
   "include": ["src/**/*.ts"]
