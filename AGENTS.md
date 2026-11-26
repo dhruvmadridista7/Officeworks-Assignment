@@ -70,13 +70,20 @@ work.
 - Cover the critical path (see SPEC.md section 9). Tests must be deterministic.
 - **Tests never call the real Fake Store API or a real SMTP server.** Use fixtures,
   fakes and mocked `fetch` / MSW.
+- After every coding prompt, run the project and verify every endpoint added or
+  changed by that prompt. Check its success response and each failure/status case
+  required by the PDF or SPEC. For every response, verify the status, content
+  type, complete response shape, and every field's expected value; also check
+  relevant side effects. Do not invent status codes the contract does not require;
+  for example, no API redirect (3xx) is currently specified. Keep checking
+  previously implemented critical paths as later changes can break them.
 - Run lint, typecheck and tests before declaring a step done.
 
 ## Working agreement (how to work with the human)
 
 - Work in small steps matching `docs/PROMPTS.md`. After each step:
   1. List the files you created/changed.
-  2. Say exactly how to verify (commands to run).
+  2. Say exactly how to verify (commands to run and endpoint/status cases checked).
   3. List any assumptions or deviations from SPEC.md.
   4. Stop. Wait for the human to review and commit.
 - Do not start the next step on your own.

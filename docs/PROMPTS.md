@@ -8,7 +8,12 @@ git checkout -b feature/product-catalogue
 ```
 
 For every step: paste the prompt, read what the AI produced, run the verify
-commands, fix problems, commit. **Log anything the AI got wrong** (for `AI_USAGE.md`).
+commands, start the app and exercise every endpoint added or changed in that
+step (success and contract-defined failure/status cases). Verify status,
+content type, response shape, and every field's expected value, plus relevant
+side effects. Fix problems and keep rechecking previous critical paths. Do not
+invent status codes absent from the contract. **Log anything the AI got wrong**
+(for `AI_USAGE.md`).
 Save the 3–5 prompts that mattered most.
 
 ---
@@ -38,7 +43,9 @@ React Testing Library, msw). Root scripts: dev, build, test, lint, typecheck.
 ESLint + Prettier. A /api/health route only, plus one trivial test in each app
 to prove the tooling works. No feature code. Explain each dependency in one line.
 ```
-Verify: `npm install && npm run lint && npm run typecheck && npm test`
+Verify: `npm install && npm run lint && npm run typecheck && npm test`; start
+`npm run dev`, confirm `GET /api/health` returns 200 `{ "status": "ok" }`, and
+confirm the web app responds at http://localhost:5173.
 Commit: `chore: scaffold monorepo`
 
 ## Prompt 2: Domain, data source, services
