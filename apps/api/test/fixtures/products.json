@@ -1,0 +1,65 @@
+[
+  {
+    "id": 1,
+    "title": "Portable Sound Speaker",
+    "price": 49.99,
+    "description": "Compact wireless speaker for home and travel.",
+    "category": "electronics",
+    "image": "https://example.com/products/1.png",
+    "rating": { "rate": 4.2, "count": 120 }
+  },
+  {
+    "id": 2,
+    "title": "Cotton Casual Shirt",
+    "price": 29.99,
+    "description": "Lightweight men's shirt for everyday wear.",
+    "category": "men's clothing",
+    "image": "https://example.com/products/2.png",
+    "rating": { "rate": 3.9, "count": 90 }
+  },
+  {
+    "id": 3,
+    "title": "Silver Chain Bracelet",
+    "price": 19.99,
+    "description": "Polished bracelet with a simple clasp.",
+    "category": "jewelery",
+    "image": "https://example.com/products/3.png",
+    "rating": { "rate": 4, "count": 200 }
+  },
+  {
+    "id": 4,
+    "title": "Classic Denim Jacket",
+    "price": 59.99,
+    "description": "A durable men's jacket with a comfortable fit.",
+    "category": "men's clothing",
+    "image": "https://example.com/products/4.png",
+    "rating": { "rate": 4.5, "count": 80 }
+  },
+  {
+    "id": 5,
+    "title": "Everyday Backpack",
+    "price": 39.99,
+    "description": "A practical bag with room for daily essentials.",
+    "category": "electronics",
+    "image": "https://example.com/products/5.png",
+    "rating": { "rate": 4.8, "count": 20 }
+  },
+  {
+    "id": 6,
+    "title": "Oxford Button-Down Shirt",
+    "price": 34.99,
+    "description": "Classic cotton button-down shirt.",
+    "category": "men's clothing",
+    "image": "https://example.com/products/6.png",
+    "rating": { "rate": 4.5, "count": 80 }
+  },
+  {
+    "id": 7,
+    "title": "Soft Knit Sweater",
+    "price": 44.99,
+    "description": "Warm sweater in a relaxed style.",
+    "category": "men's clothing",
+    "image": "https://example.com/products/7.png",
+    "rating": { "rate": 3.5, "count": 34 }
+  }
+]

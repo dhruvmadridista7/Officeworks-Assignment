@@ -16,6 +16,9 @@ coverage/
 *.log
 npm-debug.log*
 
+# Local learning notes; do not submit.
+/PROJECT_WALKTHROUGH.md
+
 # OS / editors
 .DS_Store
 Thumbs.db

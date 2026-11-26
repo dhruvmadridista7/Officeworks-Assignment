@@ -90,6 +90,10 @@ work.
 - If something you generated might be wrong or risky, say so plainly.
 - **Never write or edit `AI_USAGE.md` or the time log.** The human records those
   honestly. Never invent entries.
+- Maintain `PROJECT_WALKTHROUGH.md` as an ignored local learning guide. After
+  each prompt, explain the files and behavior added, why the boundaries exist,
+  how the main flow works, and a concise interview explanation. Never stage or
+  commit this guide.
 - Never commit or print secrets. `.env` stays out of git; `.env.example` stays in.
 
 ## Commands (keep these working; update here if they change)

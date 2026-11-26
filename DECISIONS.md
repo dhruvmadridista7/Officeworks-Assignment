@@ -19,12 +19,14 @@
 See `SPEC.md` section 3 (A1–A10) for the full list. Summary:
 
 - Featured products are *chosen* by the entrepreneur via config; missing or
-  invalid IDs fall back to the five highest-rated products with a warning (A1)
+  invalid IDs fall back to the five highest-rated products with a warning (A1);
+  ties use rating count descending, then product ID ascending
 - Category top rated = top 3 by rating (A2)
 - Search is server-side substring match on title, description, category (A3)
 - Enquiries are emailed, not persisted; failures are shown honestly (A4)
 - Abuse protection: rate limit, honeypot (A5)
-- Resilience for the upstream: timeout, retry, cache (A6)
+- Resilience for the upstream: timeout and cache; retry network/timeouts and 5xx,
+  but not 4xx or invalid payloads (A6)
 
 ## Requirements dropped or simplified, and why
 
