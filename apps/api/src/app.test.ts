@@ -94,6 +94,20 @@ describe('catalogue HTTP API', () => {
     expectJson(response, 200);
     expect(response.body).toEqual({ status: 'ok' });
     expect(response.headers['x-content-type-options']).toBe('nosniff');
+    expect(response.headers['cache-control']).toBe('no-store');
+  });
+
+  it('returns JSON rather than a bodyless 304 for a conditional API request', async () => {
+    const app = makeApp();
+    const first = await request(app).get('/api/health');
+    expect(first.headers.etag).toBeUndefined();
+    const repeated = await request(app)
+      .get('/api/health')
+      .set('If-None-Match', 'W/"cached-response"');
+
+    expectJson(repeated, 200);
+    expect(repeated.body).toEqual({ status: 'ok' });
+    expect(repeated.headers['cache-control']).toBe('no-store');
   });
 
   it('returns exactly five featured products in configured order with all domain fields', async () => {

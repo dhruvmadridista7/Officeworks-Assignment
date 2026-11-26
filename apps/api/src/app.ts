@@ -18,6 +18,7 @@ export type AppDependencies = {
 export function buildApp(deps: AppDependencies): Express {
   const app = express();
 
+  app.set('etag', false);
   app.use(helmet());
   app.use(
     cors({
@@ -27,6 +28,10 @@ export function buildApp(deps: AppDependencies): Express {
     }),
   );
   app.use(createRequestLogger(deps.logger));
+  app.use((_request, response, next) => {
+    response.setHeader('Cache-Control', 'no-store');
+    next();
+  });
   app.use(express.json({ limit: '10kb' }));
   app.use(
     '/api',
