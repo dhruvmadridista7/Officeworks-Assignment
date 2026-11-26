@@ -65,6 +65,28 @@ function expectJson(response: request.Response, status: number): void {
   expect(response.headers['content-type']).toMatch(/application\/json/);
 }
 
+function expectErrorEnvelope(
+  response: request.Response,
+  status: number,
+  code: string,
+): void {
+  expectJson(response, status);
+  expect(Object.keys(response.body)).toEqual(['error']);
+  expect(response.body.error).toEqual(
+    expect.objectContaining({ code, message: expect.any(String) }),
+  );
+  if (response.body.error.details !== undefined) {
+    expect(Array.isArray(response.body.error.details)).toBe(true);
+    for (const detail of response.body.error.details) {
+      expect(detail).toEqual({
+        field: expect.any(String),
+        message: expect.any(String),
+      });
+    }
+  }
+  expect(JSON.stringify(response.body)).not.toMatch(/\bat\s+\S+\(.*:\d+:\d+\)/);
+}
+
 describe('catalogue HTTP API', () => {
   it('returns the health contract without upstream data', async () => {
     const response = await request(makeApp()).get('/api/health');
@@ -373,5 +395,55 @@ describe('catalogue HTTP API', () => {
     const health = await request(app).get('/api/health');
     expectJson(health, 200);
     expect(health.body).toEqual({ status: 'ok' });
+  });
+
+  it('keeps one JSON error envelope across validation, not-found, rate-limit, email, and internal errors', async () => {
+    const validation = await request(makeApp()).get('/api/products');
+    expectErrorEnvelope(validation, 400, 'VALIDATION_ERROR');
+
+    const notFound = await request(makeApp()).get('/api/products/999');
+    expectErrorEnvelope(notFound, 404, 'PRODUCT_NOT_FOUND');
+
+    const rateLimitedApp = makeApp({ rateLimit: 1 });
+    const validEnquiry = {
+      productId: 1,
+      name: 'Jane',
+      email: 'jane@example.com',
+    };
+    await request(rateLimitedApp).post('/api/enquiries').send(validEnquiry);
+    const rateLimited = await request(rateLimitedApp)
+      .post('/api/enquiries')
+      .send(validEnquiry);
+    expectErrorEnvelope(rateLimited, 429, 'RATE_LIMITED');
+
+    const failingSender: EmailSender = {
+      send: vi.fn(async () => {
+        throw new Error('SMTP secret details');
+      }),
+    };
+    const deliveryFailure = await request(
+      makeApp({ emailSender: failingSender }),
+    )
+      .post('/api/enquiries')
+      .send(validEnquiry);
+    expectErrorEnvelope(deliveryFailure, 502, 'EMAIL_DELIVERY_FAILED');
+
+    const failingRepository: ProductRepository = {
+      list: vi.fn(async () => {
+        throw new Error('internal secret details');
+      }),
+      getById: vi.fn(async () => null),
+      listCategories: vi.fn(async () => categories),
+    };
+    const internalFailure = await request(
+      makeApp({
+        repository: failingRepository,
+        logger: { info: vi.fn(), error: vi.fn() },
+      }),
+    ).get('/api/products/featured');
+    expectErrorEnvelope(internalFailure, 500, 'INTERNAL_ERROR');
+    expect(JSON.stringify(internalFailure.body)).not.toContain(
+      'internal secret details',
+    );
   });
 });

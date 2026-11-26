@@ -54,12 +54,18 @@ function makeService(
 
 describe('EnquiryService', () => {
   it('looks up the product and sends one correctly addressed email with plain and HTML bodies', async () => {
-    const { service, emailSender } = makeService();
+    const sent: OutgoingEmail[] = [];
+    const emailSender: EmailSender = {
+      send: vi.fn(async (email) => {
+        sent.push(email);
+      }),
+    };
+    const { service } = makeService({ emailSender });
 
     await service.submit(input);
 
     expect(emailSender.send).toHaveBeenCalledOnce();
-    expect(emailSender.send).toHaveBeenCalledWith({
+    expect(sent[0]).toEqual({
       to: 'sales@example.com',
       from: 'catalogue@example.com',
       replyTo: 'jane@example.com',
@@ -73,10 +79,37 @@ describe('EnquiryService', () => {
         'Phone: +91 98765 43210',
         'Message: Is this in stock?',
       ].join('\n'),
-      html: expect.stringContaining(
-        '<strong>Message:</strong> Is this in stock?',
-      ),
+      html:
+        '<h1>New product enquiry</h1>' +
+        '<p><strong>Product ID:</strong> 1</p>' +
+        `<p><strong>Product:</strong> ${product.title}</p>` +
+        `<p><strong>Price:</strong> ${product.price}</p>` +
+        '<p><strong>Name:</strong> Jane Doe</p>' +
+        '<p><strong>Email:</strong> jane@example.com</p>' +
+        '<p><strong>Phone:</strong> +91 98765 43210</p>' +
+        '<p><strong>Message:</strong> Is this in stock?</p>',
     });
+  });
+
+  it('labels missing optional phone and message values in both email bodies', async () => {
+    const sent: OutgoingEmail[] = [];
+    const sender: EmailSender = {
+      send: vi.fn(async (email) => {
+        sent.push(email);
+      }),
+    };
+    const { service } = makeService({ emailSender: sender });
+
+    await service.submit({
+      productId: 1,
+      name: 'Jane',
+      email: 'jane@example.com',
+    });
+
+    expect(sent[0]?.text).toContain('Phone: (not provided)');
+    expect(sent[0]?.text).toContain('Message: (not provided)');
+    expect(sent[0]?.html).toContain('<strong>Phone:</strong> (not provided)');
+    expect(sent[0]?.html).toContain('<strong>Message:</strong> (not provided)');
   });
 
   it('escapes customer content and strips CR/LF from email headers', async () => {
