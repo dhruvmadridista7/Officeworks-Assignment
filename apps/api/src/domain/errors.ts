@@ -31,3 +31,10 @@ export class ValidationError extends Error {
     this.name = 'ValidationError';
   }
 }
+
+export class EmailDeliveryFailedError extends Error {
+  constructor(options: { cause?: unknown } = {}) {
+    super('Email delivery failed.', { cause: options.cause });
+    this.name = 'EmailDeliveryFailedError';
+  }
+}

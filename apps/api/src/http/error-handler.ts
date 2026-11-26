@@ -2,6 +2,7 @@ import type { ErrorRequestHandler } from 'express';
 import { ZodError } from 'zod';
 import {
   CategoryNotFoundError,
+  EmailDeliveryFailedError,
   ProductNotFoundError,
   UpstreamError,
   ValidationError,
@@ -14,6 +15,8 @@ type ErrorCode =
   | 'CATEGORY_NOT_FOUND'
   | 'ROUTE_NOT_FOUND'
   | 'UPSTREAM_ERROR'
+  | 'RATE_LIMITED'
+  | 'EMAIL_DELIVERY_FAILED'
   | 'INTERNAL_ERROR';
 
 type ApiError = {
@@ -84,6 +87,17 @@ function getErrorResponse(error: unknown): { status: number; body: ApiError } {
       },
     };
   }
+  if (error instanceof EmailDeliveryFailedError) {
+    return {
+      status: 502,
+      body: {
+        error: {
+          code: 'EMAIL_DELIVERY_FAILED',
+          message: 'Your enquiry could not be sent. Please try again later.',
+        },
+      },
+    };
+  }
   if (error instanceof HttpError) {
     return {
       status: error.status,
@@ -123,7 +137,8 @@ export function createErrorHandler(logger: RequestLogger): ErrorRequestHandler {
       logger.error(
         {
           errorName: error instanceof Error ? error.name : 'UnknownError',
-          errorMessage: error instanceof Error ? error.message : 'Unknown error value',
+          errorMessage:
+            error instanceof Error ? error.message : 'Unknown error value',
         },
         'Unhandled request error',
       );

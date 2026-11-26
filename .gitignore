@@ -18,6 +18,7 @@ npm-debug.log*
 
 # Local learning notes; do not submit.
 /PROJECT_WALKTHROUGH.md
+/TODO_TESTING.md
 
 # OS / editors
 .DS_Store

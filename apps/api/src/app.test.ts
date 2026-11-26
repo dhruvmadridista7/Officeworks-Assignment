@@ -4,10 +4,12 @@ import productsFixture from '../test/fixtures/products.json';
 import { describe, expect, it, vi } from 'vitest';
 import { buildApp } from './app';
 import { UpstreamError } from './domain/errors';
+import type { EmailSender } from './domain/email-sender';
 import type { ProductRepository } from './domain/product-repository';
 import type { Category, Product } from './domain/product';
 import { consoleLogger, type RequestLogger } from './http/request-logger';
 import { CatalogService } from './services/catalog-service';
+import { EnquiryService } from './services/enquiry-service';
 
 const categories: Category[] = categoriesFixture.map((name) => ({
   name,
@@ -24,7 +26,12 @@ const products: Product[] = productsFixture.map((product) => {
 });
 
 function makeApp(
-  options: { repository?: ProductRepository; logger?: RequestLogger } = {},
+  options: {
+    repository?: ProductRepository;
+    logger?: RequestLogger;
+    emailSender?: EmailSender;
+    rateLimit?: number;
+  } = {},
 ) {
   const repository = options.repository ?? {
     list: vi.fn(async () => products),
@@ -34,9 +41,21 @@ function makeApp(
     ),
     listCategories: vi.fn(async () => categories),
   };
+  const logger = options.logger ?? consoleLogger;
+  const emailSender = options.emailSender ?? {
+    send: vi.fn(async () => undefined),
+  };
   return buildApp({
     catalogService: new CatalogService(repository, '5,2,4,1,3'),
-    logger: options.logger ?? consoleLogger,
+    enquiryService: new EnquiryService(
+      repository,
+      emailSender,
+      'sales@example.com',
+      'catalogue@example.com',
+      logger,
+    ),
+    enquiryRateLimit: { limit: options.rateLimit ?? 5, windowMs: 60_000 },
+    logger,
     webOrigin: 'http://localhost:5173',
   });
 }
@@ -224,5 +243,135 @@ describe('catalogue HTTP API', () => {
       .get('/api/health')
       .set('Origin', 'https://not-allowed.example');
     expect(rejected.headers['access-control-allow-origin']).toBeUndefined();
+  });
+
+  it('accepts a valid enquiry, sends email once, and returns the exact 201 body', async () => {
+    const emailSender: EmailSender = { send: vi.fn(async () => undefined) };
+    const response = await request(makeApp({ emailSender }))
+      .post('/api/enquiries')
+      .send({
+        productId: 1,
+        name: ' Jane Doe ',
+        email: 'jane@example.com',
+        phone: '+91 98765 43210',
+        message: 'Please contact me.',
+        website: '',
+      });
+
+    expectJson(response, 201);
+    expect(response.body).toEqual({ status: 'received' });
+    expect(emailSender.send).toHaveBeenCalledOnce();
+    expect(emailSender.send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'sales@example.com',
+        from: 'catalogue@example.com',
+        replyTo: 'jane@example.com',
+        subject: `New enquiry: ${products[0].title} (#1)`,
+      }),
+    );
+  });
+
+  it('returns validation details for invalid enquiry fields', async () => {
+    const response = await request(makeApp())
+      .post('/api/enquiries')
+      .send({
+        productId: 0,
+        name: '   ',
+        email: 'not-an-email',
+        phone: '123456x',
+        message: 'x'.repeat(1001),
+      });
+
+    expectJson(response, 400);
+    expect(response.body.error.code).toBe('VALIDATION_ERROR');
+    expect(
+      response.body.error.details.map(
+        (detail: { field: string }) => detail.field,
+      ),
+    ).toEqual(['productId', 'name', 'email', 'phone', 'message']);
+  });
+
+  it('rejects JSON bodies larger than the 10 KB request limit', async () => {
+    const response = await request(makeApp())
+      .post('/api/enquiries')
+      .send({
+        productId: 1,
+        name: 'Jane Doe',
+        email: 'jane@example.com',
+        message: 'x'.repeat(11_000),
+      });
+
+    expectJson(response, 400);
+    expect(response.body).toEqual({
+      error: { code: 'VALIDATION_ERROR', message: 'Invalid request body.' },
+    });
+  });
+
+  it('responds 201 for a filled honeypot without sending email', async () => {
+    const emailSender: EmailSender = { send: vi.fn(async () => undefined) };
+    const logger: RequestLogger = { info: vi.fn(), error: vi.fn() };
+    const response = await request(makeApp({ emailSender, logger }))
+      .post('/api/enquiries')
+      .send({ website: 'filled-by-bot' });
+
+    expectJson(response, 201);
+    expect(response.body).toEqual({ status: 'received' });
+    expect(emailSender.send).not.toHaveBeenCalled();
+    expect(logger.info).toHaveBeenCalledWith(
+      { honeypotTriggered: true },
+      'Enquiry honeypot triggered',
+    );
+  });
+
+  it('returns 404 for an unknown enquiry product and 502 for email delivery failure', async () => {
+    const missingRepository: ProductRepository = {
+      list: vi.fn(async () => products),
+      listCategories: vi.fn(async () => categories),
+      getById: vi.fn(async () => null),
+    };
+    const missing = await request(makeApp({ repository: missingRepository }))
+      .post('/api/enquiries')
+      .send({ productId: 999, name: 'Jane', email: 'jane@example.com' });
+    expectJson(missing, 404);
+    expect(missing.body).toEqual({
+      error: { code: 'PRODUCT_NOT_FOUND', message: 'Product not found.' },
+    });
+
+    const failingSender: EmailSender = {
+      send: vi.fn(async () => {
+        throw new Error('private SMTP detail');
+      }),
+    };
+    const failed = await request(makeApp({ emailSender: failingSender }))
+      .post('/api/enquiries')
+      .send({ productId: 1, name: 'Jane', email: 'jane@example.com' });
+    expectJson(failed, 502);
+    expect(failed.body).toEqual({
+      error: {
+        code: 'EMAIL_DELIVERY_FAILED',
+        message: 'Your enquiry could not be sent. Please try again later.',
+      },
+    });
+    expect(JSON.stringify(failed.body)).not.toContain('private SMTP detail');
+  });
+
+  it('rate limits only the enquiry route and returns the shared 429 error', async () => {
+    const app = makeApp({ rateLimit: 1 });
+    const body = { productId: 1, name: 'Jane', email: 'jane@example.com' };
+    const first = await request(app).post('/api/enquiries').send(body);
+    expectJson(first, 201);
+
+    const second = await request(app).post('/api/enquiries').send(body);
+    expectJson(second, 429);
+    expect(second.body).toEqual({
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'Too many enquiries. Please try again later.',
+      },
+    });
+
+    const health = await request(app).get('/api/health');
+    expectJson(health, 200);
+    expect(health.body).toEqual({ status: 'ok' });
   });
 });
