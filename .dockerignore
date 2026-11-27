@@ -1,0 +1,14 @@
+.git
+.github
+.vscode
+node_modules
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+.env
+.env.*
+!.env.example
+TODO_TESTING.md
+PROJECT_WALKTHROUGH.md
+AI_USAGE.md
